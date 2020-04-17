@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keys and doors</title>
+    <style>
+        body {
+            height: 90vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #gameDiv>* {
+            border: 1px dashed black;
+        }
+        @font-face {
+            font-family: reblinking;
+            src: url(assets/fonts/reblinking.ttf);
+        }
+    </style>
+    <script src="pixi/pixi.min.js"></script>
+    <script src="js/keyboard.js"></script>
+    <script>
+
+        let app, bgBack,bgMiddle,bgFront;
+        let bgX = 0;
+        let bgSpeed = 0;
+        let state;
+        let msScore;
+        let left, up, right, down;
+        let ssheet ;
+        let playerSheet = {};
+        let player;
+        let score = 0;
+        let enemy;
+        let time_enemy = 8000;
+        let time_count = 1;
+
+        let fontStyle = new PIXI.TextStyle({
+            fontFamily: "Proxy 1",
+            fill: 0xAAAAAA,
+            fontSize: 26,
+            fontWeight: "bolder"
+        });  
+
+        window.onload = function() {
+            app = new PIXI.Application({
+                width: 800,
+                height: 600,
+                backgroundColor: 0xAAAAAA
+            });
+
+            document.querySelector("#gameDiv").appendChild(app.view);
+
+            app.loader.baseUrl = "assets";
+            app.loader
+                .add("bgBack","forest_pack/back-trees.png")
+                .add("bgMiddle","forest_pack/middle-trees.png")
+                .add("bgFront","forest_pack/front-trees.png")
+                .add("jim","jim.png");
+            app.loader.onComplete.add(initLevel);
+            app.loader.load(setup);      
+        }
+
+        function setup() {
+            bgBack = createBg(app.loader.resources["bgBack"].texture);      
+            bgMiddle = createBg(app.loader.resources["bgMiddle"].texture);
+            bgFront = createBg(app.loader.resources["bgFront"].texture);
+
+            bgBack.scale.y = 3.8;
+            bgBack.scale.x = 2;
+            
+            bgMiddle.scale.y = 3.8;
+            bgMiddle.scale.x = 2;
+            
+            bgFront.scale.y = 3.8;
+            bgFront.scale.x = 2;
+
+            msScore = new PIXI.Text("Score: 0",fontStyle);
+            msScore.position.set(545,80);
+            app.stage.addChild(msScore);
+
+            createdPlayerSheet();
+            createPlayer();
+            createEnemy();
+            
+            configControls();
+            timeout();
+            //setInterval(() => { enemy.x = 800}, time_enemy);
+
+            state = initLevel;
+            app.ticker.add(delta => gemeLoop(delta));
+        }
+
+        function gemeLoop(delta) {
+            state(delta)
+        }
+
+        function initLevel() {
+            
+            //document.addEventListener("keyup",switchDir);
+            if(player !== undefined) {
+                moveEnemy();
+                jumpPlayer();
+                updateBg();
+                updateScore();
+                
+                if(time_enemy > 5000) setTimeEnemy();
+                if(player.y > 500) player.y = 500;
+                
+            }
+        }
+
+        function timeout() {
+            console.log("Se ejecuto. Posicion x:" + enemy.x)
+            setTimeout(() => { 
+                enemy.x = 800;
+                timeout();
+            }, time_enemy);
+        }
+
+        function setTimeEnemy() {
+            if(score > 100 * time_count) {
+                time_enemy -= 5;
+                time_count++;
+                console.log("Velocidad time_enemy:"+time_enemy);
+            }
+        }
+
+        function createBg(texture) {
+            let tiling = new PIXI.TilingSprite(texture,800,600);
+            tiling.position.set(0,0);
+            app.stage.addChild(tiling);
+
+            return tiling; 
+        }
+
+        function createEnemy() {
+            enemy =  new PIXI.Graphics();
+            enemy.lineStyle(4, 0xFF3300, 1);
+            enemy.beginFill(0x66CCFF);
+            enemy.drawRect(800, 500, 64, 64);
+            enemy.endFill();
+            enemy.vx = 4;
+            
+            app.stage.addChild(enemy);
+        }
+
+        function updateBg() {
+            bgX = (bgX + bgSpeed);
+            bgFront.tilePosition.x = bgX;
+            bgMiddle.tilePosition.x = bgX / 2;
+            bgBack.tilePosition.x = bgX / 4;
+        }
+
+        function updateScore() {
+            score += -(bgSpeed);
+            msScore.text = "Score:" + score;
+        }
+
+        function createEnemies() {
+            
+        }
+
+        function moveEnemy() {
+            enemy.x -= enemy.vx;   
+        }
+
+        function jumpPlayer() {
+
+            player.y += player.vy;
+            if(player.y < 450) {
+                player.vy = +6;
+            } 
+         
+        }
+
+        function createdPlayerSheet() {
+            ssheet = new PIXI.BaseTexture.from(app.loader.resources["jim"].url);
+            let w = 30;
+            let h = 70;
+
+            playerSheet["standWest"] = [
+                new PIXI.Texture(ssheet, new PIXI.Rectangle(0, 142, w, h))
+            ];
+            playerSheet["standEast"] = [
+                new PIXI.Texture(ssheet, new PIXI.Rectangle(0, 215, w, h))
+            ];
+                     
+            playerSheet["walkWest"] = [
+                new PIXI.Texture(ssheet, new PIXI.Rectangle(1 * w+2, 142, w, h)),
+                new PIXI.Texture(ssheet, new PIXI.Rectangle(2 * w+8, 142, w, h)),
+                new PIXI.Texture(ssheet, new PIXI.Rectangle(3 * w+6, 142, w, h)),
+                new PIXI.Texture(ssheet, new PIXI.Rectangle(4 * w+7, 142, w, h)),
+                new PIXI.Texture(ssheet, new PIXI.Rectangle(5 * w+12, 142, w, h)),
+                new PIXI.Texture(ssheet, new PIXI.Rectangle(6 * w+10, 142, w, h))
+            ];
+            playerSheet["walkEast"] = [
+                new PIXI.Texture(ssheet, new PIXI.Rectangle(1 * w+2, 215, w, h)),
+                new PIXI.Texture(ssheet, new PIXI.Rectangle(2 * w+8, 215, w, h)),
+                new PIXI.Texture(ssheet, new PIXI.Rectangle(3 * w+6, 215, w, h)),
+                new PIXI.Texture(ssheet, new PIXI.Rectangle(4 * w+7, 215, w, h)),
+                new PIXI.Texture(ssheet, new PIXI.Rectangle(5 * w+12, 215, w, h)),
+                new PIXI.Texture(ssheet, new PIXI.Rectangle(6 * w+10, 215, w, h))
+            ];
+            
+        }
+
+        function createPlayer() {
+            player = new PIXI.AnimatedSprite(playerSheet.standEast);
+            player.anchor.set(0.5);
+            player.animationSpeed = .1;
+            player.loop = true;
+            player.x = 100;
+            player.y = app.view.height - 72;
+            player.vy = 0;
+            player.scale.x = 2;
+            player.scale.y = 2;
+            app.stage.addChild(player);
+            player.play();
+        }
+
+        function configControls() {
+            //Capture the keyboard arrow keys
+            left = keyboard("ArrowLeft");
+            up = keyboard("ArrowUp");
+            right = keyboard("ArrowRight");
+            down = keyboard("ArrowDown");
+
+            left.press = () => {
+                bgSpeed = 1;
+                enemy.vx = 3;
+                player.textures = playerSheet.walkWest;
+                player.play();
+            };
+
+            left.release = () => {
+                if (!right.isDown) {
+                 bgSpeed = 0;
+                 player.textures = playerSheet.standWest;
+                 enemy.vx = 4;              
+                }
+            };
+
+            right.press = () => {
+                bgSpeed = -1;
+                enemy.vx = 6;
+                player.textures = playerSheet.walkEast;
+                player.play();
+            };
+  
+            right.release = () => {
+                if (!left.isDown) {
+                 bgSpeed = 0;
+                 enemy.vx = 4; 
+                 player.textures = playerSheet.standEast;
+                }
+            };
+
+            /*
+            up.touch = () => {
+                player.vy = -6;
+            }*/
+            window.addEventListener(
+                "keypress", touchJump, false
+            );
+        }
+
+        function touchJump(e) {
+            if(e.key === " ") {
+                player.vy = -6;
+                e.preventDefault();
+            }
+        }
+
+    </script>
+</head>
+<body>
+    
+    <div id="gameDiv"></div>
+
+</body>
+</html>
