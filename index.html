@@ -21,28 +21,44 @@
     </style>
     <script src="pixi/pixi.min.js"></script>
     <script src="js/keyboard.js"></script>
+    <script src="js/collision.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/background.js"></script>
+    <script src="js/enemy.js"></script>
     <script>
 
         let app, bgBack,bgMiddle,bgFront;
         let bgX = 0;
         let bgSpeed = 0;
+        let bgGameOver;
         let state;
         let msScore;
+        let msRetry;
         let left, up, right, down;
-        let ssheet ;
+        let ssheet;
+        let esheet;
         let playerSheet = {};
+        let enemySheet = {};
         let player;
         let score = 0;
         let enemy;
         let time_enemy = 8000;
         let time_count = 1;
+        let retry = false;
 
-        let fontStyle = new PIXI.TextStyle({
+        let fontScore = new PIXI.TextStyle({
             fontFamily: "Proxy 1",
             fill: 0xAAAAAA,
             fontSize: 26,
             fontWeight: "bolder"
-        });  
+        });
+        
+        let fontRetry = new PIXI.TextStyle({
+            fontFamily: "Roboto,Arial",
+            fill: 0xAAAAAA,
+            fontSize: 46,
+            fontWeight: "bolder"
+        });
 
         window.onload = function() {
             app = new PIXI.Application({
@@ -58,12 +74,14 @@
                 .add("bgBack","forest_pack/back-trees.png")
                 .add("bgMiddle","forest_pack/middle-trees.png")
                 .add("bgFront","forest_pack/front-trees.png")
-                .add("jim","jim.png");
+                .add("jim","jim.png")
+                .add("mouse","mouse-tile.png");
             app.loader.onComplete.add(initLevel);
             app.loader.load(setup);      
         }
 
         function setup() {
+
             bgBack = createBg(app.loader.resources["bgBack"].texture);      
             bgMiddle = createBg(app.loader.resources["bgMiddle"].texture);
             bgFront = createBg(app.loader.resources["bgFront"].texture);
@@ -77,14 +95,26 @@
             bgFront.scale.y = 3.8;
             bgFront.scale.x = 2;
 
-            msScore = new PIXI.Text("Score: 0",fontStyle);
+            msScore = new PIXI.Text("Score: 0",fontScore);
             msScore.position.set(545,80);
             app.stage.addChild(msScore);
 
+            msRetry = new PIXI.Text("Retry?",fontRetry);
+            msRetry.position.set(300,300);
+            app.stage.addChild(msRetry);
+            msRetry.visible = false;
+            msRetry.interactive = true;
+            msRetry.buttonMode = true;
+            msRetry.on('click', (event) => {
+                retry = true//handle event
+            });
+
             createdPlayerSheet();
+            cretedEnemySheet();
+
             createPlayer();
             createEnemy();
-            
+            enemy.vx = 4;
             configControls();
             timeout();
             //setInterval(() => { enemy.x = 800}, time_enemy);
@@ -106,9 +136,34 @@
                 updateBg();
                 updateScore();
                 
+                if(hitTestRectangle(player,enemy)) {console.log("¡¡¡Colision!!!");state = gameOver;}
                 if(time_enemy > 5000) setTimeEnemy();
-                if(player.y > 500) player.y = 500;
                 
+                if(player.y < 400) {
+                    player.vy = 10;                    
+                } 
+                
+                if(player.y >= 580) {        
+                    player.y = 580;
+                }
+                
+                console.log("enemy.x:"+enemy.x+" - player.x:"+player.x);
+                console.log("player.y:"+player.y);
+            }
+        }
+
+        function gameOver() {
+            player.stop();
+            enemy.stop();
+            msRetry.visible = true;
+            if(retry) {
+                score = 0;
+                msRetry.visible = false;
+                retry = false;
+                enemy.x = 800;
+                enemy.play();
+                player.play();               
+                state = initLevel;
             }
         }
 
@@ -120,105 +175,9 @@
             }, time_enemy);
         }
 
-        function setTimeEnemy() {
-            if(score > 100 * time_count) {
-                time_enemy -= 5;
-                time_count++;
-                console.log("Velocidad time_enemy:"+time_enemy);
-            }
-        }
-
-        function createBg(texture) {
-            let tiling = new PIXI.TilingSprite(texture,800,600);
-            tiling.position.set(0,0);
-            app.stage.addChild(tiling);
-
-            return tiling; 
-        }
-
-        function createEnemy() {
-            enemy =  new PIXI.Graphics();
-            enemy.lineStyle(4, 0xFF3300, 1);
-            enemy.beginFill(0x66CCFF);
-            enemy.drawRect(800, 500, 64, 64);
-            enemy.endFill();
-            enemy.vx = 4;
-            
-            app.stage.addChild(enemy);
-        }
-
-        function updateBg() {
-            bgX = (bgX + bgSpeed);
-            bgFront.tilePosition.x = bgX;
-            bgMiddle.tilePosition.x = bgX / 2;
-            bgBack.tilePosition.x = bgX / 4;
-        }
-
         function updateScore() {
             score += -(bgSpeed);
             msScore.text = "Score:" + score;
-        }
-
-        function createEnemies() {
-            
-        }
-
-        function moveEnemy() {
-            enemy.x -= enemy.vx;   
-        }
-
-        function jumpPlayer() {
-
-            player.y += player.vy;
-            if(player.y < 450) {
-                player.vy = +6;
-            } 
-         
-        }
-
-        function createdPlayerSheet() {
-            ssheet = new PIXI.BaseTexture.from(app.loader.resources["jim"].url);
-            let w = 30;
-            let h = 70;
-
-            playerSheet["standWest"] = [
-                new PIXI.Texture(ssheet, new PIXI.Rectangle(0, 142, w, h))
-            ];
-            playerSheet["standEast"] = [
-                new PIXI.Texture(ssheet, new PIXI.Rectangle(0, 215, w, h))
-            ];
-                     
-            playerSheet["walkWest"] = [
-                new PIXI.Texture(ssheet, new PIXI.Rectangle(1 * w+2, 142, w, h)),
-                new PIXI.Texture(ssheet, new PIXI.Rectangle(2 * w+8, 142, w, h)),
-                new PIXI.Texture(ssheet, new PIXI.Rectangle(3 * w+6, 142, w, h)),
-                new PIXI.Texture(ssheet, new PIXI.Rectangle(4 * w+7, 142, w, h)),
-                new PIXI.Texture(ssheet, new PIXI.Rectangle(5 * w+12, 142, w, h)),
-                new PIXI.Texture(ssheet, new PIXI.Rectangle(6 * w+10, 142, w, h))
-            ];
-            playerSheet["walkEast"] = [
-                new PIXI.Texture(ssheet, new PIXI.Rectangle(1 * w+2, 215, w, h)),
-                new PIXI.Texture(ssheet, new PIXI.Rectangle(2 * w+8, 215, w, h)),
-                new PIXI.Texture(ssheet, new PIXI.Rectangle(3 * w+6, 215, w, h)),
-                new PIXI.Texture(ssheet, new PIXI.Rectangle(4 * w+7, 215, w, h)),
-                new PIXI.Texture(ssheet, new PIXI.Rectangle(5 * w+12, 215, w, h)),
-                new PIXI.Texture(ssheet, new PIXI.Rectangle(6 * w+10, 215, w, h))
-            ];
-            
-        }
-
-        function createPlayer() {
-            player = new PIXI.AnimatedSprite(playerSheet.standEast);
-            player.anchor.set(0.5);
-            player.animationSpeed = .1;
-            player.loop = true;
-            player.x = 100;
-            player.y = app.view.height - 72;
-            player.vy = 0;
-            player.scale.x = 2;
-            player.scale.y = 2;
-            app.stage.addChild(player);
-            player.play();
         }
 
         function configControls() {
@@ -269,9 +228,12 @@
 
         function touchJump(e) {
             if(e.key === " ") {
-                player.vy = -6;
-                e.preventDefault();
+                if(player.y >= 580) { 
+                    player.vy = -18;
+                    e.preventDefault();
+                }
             }
+           // window.removeEventListener("keydown", downListener);
         }
 
     </script>

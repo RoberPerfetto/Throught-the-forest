@@ -58,7 +58,7 @@ function keyboard(value) {
     key.unsubscribe = () => {
       window.removeEventListener("keydown", downListener);
       window.removeEventListener("keyup", upListener);
-      window.removeEventListener("keypress",pressListener);
+      //window.removeEventListener("keypress",pressListener);
     };
     
     return key;
